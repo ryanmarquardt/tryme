@@ -2,6 +2,8 @@
 
 from http.server import BaseHTTPRequestHandler
 from configparser import ConfigParser
+from cgi import FieldStorage
+import json
 
 
 def join(*elements):
@@ -121,6 +123,30 @@ class RequestHandler(BaseHTTPRequestHandler):
             "4.0.0-beta.2/css/bootstrap.min.css",
     }
 
+    @property
+    def html(self):
+        try:
+            with open(self.name + '.html', 'r') as f:
+                return f.read()
+        except FileNotFoundError:
+            return self.default_html
+
+    @property
+    def css(self):
+        try:
+            with open(self.name + '.css', 'r') as f:
+                return f.read()
+        except FileNotFoundError:
+            return self.default_css
+
+    @property
+    def js(self):
+        try:
+            with open(self.name + '.js', 'r') as f:
+                return f.read()
+        except FileNotFoundError:
+            return self.default_js
+
     def do_GET(self, do_data=True):
         the_doc = self.make_document('utf-8')
         self.send_head(the_doc)
@@ -178,6 +204,39 @@ class RequestHandler(BaseHTTPRequestHandler):
             *[Script({'src': v}) for v in libraries.values()
               if v.endswith('.js')],
             Script()(r"""
+function sendToServer() {
+    var data = new FormData($("form")[0]);
+    var button = $("#submitButton");
+    button.prop("disabled", true);
+    $.ajax({
+        url: '/',
+        data: data,
+        cache: false,
+        contentType: false,
+        timeout: 4000,
+        processData: false,
+        method: 'POST'
+    })
+    .always(function () {
+        button.prop("disabled", false);
+    })
+    .done(function () {
+        console.log("Saved");
+    })
+    .fail(function(jqXHR, textStatus, errorThrown) {
+        var message = "Request failed: "
+        if (textStatus=="error") {
+            if (jqXHR.status==0) {
+                message = message + "Unable to connect";
+            } else {
+                message = message + "[" + jqXHR.status + "] " + errorThrown;
+            }
+        } else {
+            message = message + textStatus + " " + errorThrown;
+        }
+        console.error(message);
+    });
+}
 var updateTimeoutId = 0;
 function updateTryMe(force) {
     if (updateTimeoutId > 0) {
@@ -286,7 +345,7 @@ updateTryMe(true);
                                 'name': 'html',
                                 'class': 'form-control code-input',
                                 'oninput': 'updateTryMe();',
-                                'rows': textarea_rows})(self.default_html),
+                                'rows': textarea_rows})(self.html),
                         ),
                         Div('form-group tab-pane fade',
                             id='css-wrapper',
@@ -296,7 +355,7 @@ updateTryMe(true);
                                 'name': 'css',
                                 'class': 'form-control code-input',
                                 'oninput': 'updateTryMe();',
-                                'rows': textarea_rows})(self.default_css),
+                                'rows': textarea_rows})(self.css),
                         ),
                         Div('form-group tab-pane fade',
                             id='javascript-wrapper',
@@ -306,7 +365,7 @@ updateTryMe(true);
                                 'name': 'javascript',
                                 'class': 'form-control code-input',
                                 'oninput': 'updateTryMe();',
-                                'rows': textarea_rows})(self.default_js),
+                                'rows': textarea_rows})(self.js),
                         ),
                         Div('form-group tab-pane fade',
                             id='libraries-wrapper',
@@ -323,6 +382,12 @@ updateTryMe(true);
                             for name, url in libraries.items()
                         ]),
                     ),
+                    Button({
+                        'type': 'button',
+                        'class': 'btn btn-primary',
+                        'onclick': 'sendToServer()',
+                        'id': 'submitButton',
+                    })("Save"),
                 )),
                 Div('col-md-6')(
                     Label({'for': 'preview'})("Result"),
@@ -335,3 +400,26 @@ updateTryMe(true);
             Html()(head, body)
         )
         return str(doc).encode(charset)
+
+    def do_POST(self):
+        data = FieldStorage(self.rfile, environ=dict(
+            REQUEST_METHOD='post',
+            QUERY_STRING='',
+        ), headers=self.headers)
+        if 'html' in data:
+            with open(self.name + '.html', 'w') as f:
+                f.write(data['html'].value)
+        if 'css' in data:
+            with open(self.name + '.css', 'w') as f:
+                f.write(data['css'].value)
+        if 'javascript' in data:
+            with open(self.name + '.js', 'w') as f:
+                f.write(data['javascript'].value)
+        the_data = json.dumps(dict(status='ok')).encode('utf-8')
+        self.send_response(200)
+        self.send_header("Content-Type", "text/json")
+        self.send_header("Content-Length", len(the_data))
+        self.end_headers()
+        self.wfile.write(the_data)
+        self.wfile.flush()
+
