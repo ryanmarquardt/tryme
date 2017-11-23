@@ -240,17 +240,6 @@ updateTryMe(true);
                     Tag.new('h1')()('TryMe Code Preview Machine'),
                 ),
                 Div('col-md-6')(Form()(
-
-# <nav class="nav nav-tabs" id="myTab" role="tablist">
-#   <a class="nav-item nav-link active" id="nav-home-tab" data-toggle="tab" href="#nav-home" role="tab" aria-controls="nav-home" aria-selected="true">Home</a>
-#   <a class="nav-item nav-link" id="nav-profile-tab" data-toggle="tab" href="#nav-profile" role="tab" aria-controls="nav-profile" aria-selected="false">Profile</a>
-#   <a class="nav-item nav-link" id="nav-contact-tab" data-toggle="tab" href="#nav-contact" role="tab" aria-controls="nav-contact" aria-selected="false">Contact</a>
-# </nav>
-# <div class="tab-content" id="nav-tabContent">
-#   <div class="tab-pane fade show active" id="nav-home" role="tabpanel" aria-labelledby="nav-home-tab">...</div>
-#   <div class="tab-pane fade" id="nav-profile" role="tabpanel" aria-labelledby="nav-profile-tab">...</div>
-#   <div class="tab-pane fade" id="nav-contact" role="tabpanel" aria-labelledby="nav-contact-tab">...</div>
-# </div>
                     Nav({
                         'class': 'nav nav-tabs',
                         'id': 'nav-tabs',
@@ -292,7 +281,6 @@ updateTryMe(true);
                         Div('form-group tab-pane fade show active',
                             id='html-wrapper',
                             role='tabpanel')(
-                            # Label({'for': 'html-input'})("HTML"),
                             Textarea({
                                 'id': 'html-input',
                                 'name': 'html',
@@ -303,7 +291,6 @@ updateTryMe(true);
                         Div('form-group tab-pane fade',
                             id='css-wrapper',
                             role='tabpanel')(
-                            # Label({'for': 'css-input'})("CSS"),
                             Textarea({
                                 'id': 'css-input',
                                 'name': 'css',
@@ -314,7 +301,6 @@ updateTryMe(true);
                         Div('form-group tab-pane fade',
                             id='javascript-wrapper',
                             role='tabpanel')(
-                            # Label({'for': 'js-input'})("Javascript"),
                             Textarea({
                                 'id': 'js-input',
                                 'name': 'javascript',
