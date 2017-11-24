@@ -237,6 +237,16 @@ function sendToServer() {
         console.error(message);
     });
 }
+function insertAtCursor(el, newText) {
+  var start = el.prop("selectionStart")
+  var end = el.prop("selectionEnd")
+  var text = el.val()
+  var before = text.substring(0, start)
+  var after  = text.substring(end, text.length)
+  el.val(before + newText + after)
+  el[0].selectionStart = el[0].selectionEnd = start + newText.length
+  el.focus()
+}
 var updateTimeoutId = 0;
 function updateTryMe(force) {
     if (updateTimeoutId > 0) {
@@ -291,6 +301,13 @@ function updateTryMe(force) {
     }
 }
 updateTryMe(true);
+$("textarea").keydown(function (event) {
+    if (event.which == 9) {
+        event.preventDefault();
+        insertAtCursor($(event.target), "  ");
+        console.log("Tab");
+    }
+})
             """)
         )
         body = Body()(
