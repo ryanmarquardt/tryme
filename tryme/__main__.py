@@ -15,8 +15,6 @@ parser.add_argument('port', nargs='?', default=8001, type=int)
 args = parser.parse_args()
 
 RequestHandler.name = args.name
-RequestHandler.config = ConfigParser()
-RequestHandler.config.read(args.name + '-libs.ini')
 
 # RequestHandler.make_document(RequestHandler)
 
