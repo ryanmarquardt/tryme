@@ -429,11 +429,11 @@ function updateTryMe(force) {
     the_doc.write(document.getElementById("css-input").value);
     the_doc.write("<\/style>")
     the_doc.write("</head><body>")
-    the_doc.write(document.getElementById("html-input").value);
     the_doc.write("<div id=\"js-console-wrapper\">");
     the_doc.write("<div id=\"js-console-header\">");
     the_doc.write("Javascript Console Output");
     the_doc.write("<\/div><ul id=\"js-console\"><\/ul><\/div>")
+    the_doc.write(document.getElementById("html-input").value);
     $("[data-template$=\".js\"]").each(function() {
         var version = $(this).closest(".list-group-item").find("select").val();
         var url = $(this).attr("data-template");
