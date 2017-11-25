@@ -215,17 +215,90 @@ class RequestHandler(BaseHTTPRequestHandler):
                 for section in self.config.sections())
 
     def do_GET(self, do_data=True):
-        the_doc = self.make_document('utf-8')
-        self.send_head(the_doc)
+        if self.path == '/':
+            the_doc = self.make_document('utf-8')
+            mime_type = "text/html"
+        elif self.path == '/tryme.js':
+            the_doc = r"""
+function consoleOverride(method, handler) {
+    var console = window.console;
+    if (console) {
+        var original = console[method];
+        console[method] = function () {
+            if (!handler.apply(console, arguments)) {
+                if (original.apply) {
+                    // Do this for normal browsers
+                    original.apply(console, arguments);
+                } else {
+                    // Do this for IE
+                    var message = Array.prototype.slice.apply(arguments).join(' ');
+                    original(message);
+                }
+            }
+        }
+    }
+}
+$(".js-console-wrapper").css("position", "static");
+function jsConsoleAppend(cls) {
+    return function () {
+        $("#js-console").append(
+            "<li class=\"" + cls + "\">" +
+            Array.from(arguments).join(', ') +
+            "<\/li>"
+        );
+    }
+}
+consoleOverride('log', jsConsoleAppend("js-console-log"));
+consoleOverride('warn', jsConsoleAppend("js-console-warn"));
+consoleOverride('error', jsConsoleAppend("js-console-error"));
+""".encode('utf-8')
+            mime_type = 'text/javascript'
+        elif self.path == '/tryme.css':
+            the_doc = r"""
+#js-console-wrapper {
+    position: fixed;
+    width: 100%;
+    top: 67%;
+    height: 33%;
+    overflow-x: hidden;
+    overflow-y: scroll;
+}
+.js-console-warn {
+    background-color: yellow;
+}
+.js-console-error {
+    background-color: red;
+}
+#js-console-wrapper {
+    border-top: 1px solid black;
+}
+#js-console-header,
+.js-console-log,
+.js-console-warn,
+.js-console-error {
+    border-bottom: 1px solid black;
+}
+#js-console {
+    list-style: none;
+    padding-left: 0;
+}
+""".encode('utf-8')
+            mime_type = 'text/css'
+        else:
+            self.send_response(404)
+            self.end_headers()
+            return
+        self.send_head(the_doc, mime_type)
         if do_data:
             self.wfile.write(the_doc)
+            self.wfile.flush()
 
     def do_HEAD(self):
         self.do_GET(do_data=False)
 
-    def send_head(self, the_doc):
+    def send_head(self, the_doc, mime_type):
         self.send_response(200)
-        self.send_header("Content-Type", "text/html")
+        self.send_header("Content-Type", mime_type)
         self.send_header("Content-Length", len(the_doc))
         self.end_headers()
 
@@ -261,6 +334,10 @@ class RequestHandler(BaseHTTPRequestHandler):
 .code-input {
     font-family: SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono",
                  "Courier New",monospace;
+}
+iframe {
+    width: 100%;
+    height: 100%;
 }
             """),
         )
@@ -335,6 +412,7 @@ function updateTryMe(force) {
     var the_doc = iframe_window.document;
     the_doc.open();
     the_doc.write("<html><head>")
+    the_doc.write("<link rel=\"stylesheet\" href=\"/tryme.css\">");
     $("[data-template$=\".css\"]").each(function() {
         var version = $(this).closest(".list-group-item").find("select").val();
         var url = $(this).attr("data-template");
@@ -352,6 +430,10 @@ function updateTryMe(force) {
     the_doc.write("<\/style>")
     the_doc.write("</head><body>")
     the_doc.write(document.getElementById("html-input").value);
+    the_doc.write("<div id=\"js-console-wrapper\">");
+    the_doc.write("<div id=\"js-console-header\">");
+    the_doc.write("Javascript Console Output");
+    the_doc.write("<\/div><ul id=\"js-console\"><\/ul><\/div>")
     $("[data-template$=\".js\"]").each(function() {
         var version = $(this).closest(".list-group-item").find("select").val();
         var url = $(this).attr("data-template");
@@ -363,7 +445,8 @@ function updateTryMe(force) {
             the_doc.write("\"><\/script>");
         }
         $(this).text(url);
-    })
+    });
+    the_doc.write("<script src=\"/tryme.js\"><\/script>");
     the_doc.write("<script>")
     the_doc.write(document.getElementById("js-input").value);
     the_doc.write("<\/script></body>");
@@ -503,20 +586,6 @@ $("textarea").keydown(function (event) {
                 ],
             ) for lib in self.libraries
         ])
-        return [
-            Div('form-check')(
-                Label({'class': 'form-check-label'})(
-                    Input({
-                        'class': 'form-check-input',
-                        'type': 'checkbox',
-                        'name': 'libraries',
-                        'value': lib.name,
-                        'checked': True}),
-                    lib.name,
-                )
-            )
-            for lib in self.libraries
-        ]
 
     def do_POST(self):
         data = FieldStorage(self.rfile, environ=dict(
@@ -541,4 +610,3 @@ $("textarea").keydown(function (event) {
         self.end_headers()
         self.wfile.write(the_data)
         self.wfile.flush()
-
