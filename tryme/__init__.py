@@ -85,6 +85,9 @@ Textarea = Tag.new('textarea')
 Label = Tag.new('label')
 Pre = Tag.new('pre')
 Nav = Tag.new('nav')
+Ul = Tag.new('ul')
+Li = Tag.new('li')
+Option = Tag.new('option')
 
 
 class Div(Tag):
@@ -105,23 +108,82 @@ class Form(Tag):
         super().__init__(*args, **kwargs)
 
 
+class Select(Tag):
+    name = 'select'
+
+    def __init__(self, *args, **kwargs):
+        options = kwargs.pop('options', None)
+        selected =kwargs.pop('selected', None)
+        super().__init__(*args, **kwargs)
+        if options:
+            for value, display in options:
+                self.children.append(
+                    Option({
+                        'value': value,
+                        'selected': value == selected,
+                    })(display))
+
+
+class Library:
+    def __init__(self, name, section):
+        self.data = section
+        self.name = name
+
+    @property
+    def versions(self):
+        if not self.data.get('versions'):
+            self.data['versions'] = 'current'
+        return self.data['versions'].split()
+
+    @property
+    def current_version(self):
+        if not self.data.get('enabled'):
+            self.data['enabled'] = self.versions[0]
+        return self.data['enabled']
+
+    @classmethod
+    def from_section(cls, config, section):
+        return cls(section, config[section])
+
+    def templates(self):
+        yield from self.data.get('css', '').split()
+        yield from self.data.get('js', '').split()
+
+    def css(self):
+        version = self.data.get('enabled', '') or self.versions[0]
+        return (
+            template.format(version=version)
+            for template in self.data.get('css', '').split())
+
+    def js(self):
+        version = self.data.get('enabled', '') or self.versions[0]
+        return (
+            template.format(version=version)
+            for template in self.data.get('js', '').split())
+
+
 class RequestHandler(BaseHTTPRequestHandler):
     default_html = "&lt;h1 class=\"text-success\"&gt;Success&lt;/h1&gt;"
     default_css = ".text-success {\n  color: green;\n}"
     default_js = """$("h1").click(function () {
   alert("Clicked the header");
 })"""
-    libraries = {
-        'JQuery 3.2.1': "https://code.jquery.com/jquery-3.2.1.min.js",
-        'Popper.js 1.12.3': "https://cdnjs.cloudflare.com/ajax/libs/popper.js/"
-                            "1.12.3/umd/popper.min.js",
-        'Bootstrap.js 4.0.0-beta.2':
-            "https://maxcdn.bootstrapcdn.com/bootstrap/"
-            "4.0.0-beta.2/js/bootstrap.min.js",
-        'Bootstrap.css 4.0.0-beta.2':
-            "https://maxcdn.bootstrapcdn.com/bootstrap/"
-            "4.0.0-beta.2/css/bootstrap.min.css",
-    }
+    # libraries = {
+    #     'JQuery 3.2.1': "https://code.jquery.com/jquery-3.2.1.min.js",
+    #     'Popper.js 1.12.3': "https://cdnjs.cloudflare.com/ajax/libs/popper.js/"
+    #                         "1.12.3/umd/popper.min.js",
+    #     'Bootstrap.js 4.0.0-beta.2':
+    #         "https://maxcdn.bootstrapcdn.com/bootstrap/"
+    #         "4.0.0-beta.2/js/bootstrap.min.js",
+    #     'Bootstrap.css 4.0.0-beta.2':
+    #         "https://maxcdn.bootstrapcdn.com/bootstrap/"
+    #         "4.0.0-beta.2/css/bootstrap.min.css",
+    # }
+
+    def __init__(self, *args, **kwargs):
+        self.config =  ConfigParser()
+        self.config.read(self.name + '-libs.ini')
+        super().__init__(*args, **kwargs)
 
     @property
     def html(self):
@@ -147,6 +209,11 @@ class RequestHandler(BaseHTTPRequestHandler):
         except FileNotFoundError:
             return self.default_js
 
+    @property
+    def libraries(self):
+        return (Library.from_section(self.config, section)
+                for section in self.config.sections())
+
     def do_GET(self, do_data=True):
         the_doc = self.make_document('utf-8')
         self.send_head(the_doc)
@@ -163,9 +230,6 @@ class RequestHandler(BaseHTTPRequestHandler):
         self.end_headers()
 
     def make_document(self, charset='utf-8', textarea_rows=20):
-        libraries = self.libraries
-        if hasattr(self, 'config'):
-            libraries.update(self.config.items('libraries'))
         head = Head()(
             Meta({'charset': charset}),
             Meta({'name': 'viewport',
@@ -173,9 +237,9 @@ class RequestHandler(BaseHTTPRequestHandler):
                              ' shrink-to-fit=no'}),
             Title('Try Me'),
 
-            *[Link({'rel': 'stylesheet', 'href': v})
-                for v in libraries.values()
-                if v.endswith('.css')],
+            *[Link({'rel': 'stylesheet', 'href': url})
+                for lib in self.libraries
+                for url in lib.css()],
             Style({'type': 'text/css'})("""
 #preview {
     height: 30em;
@@ -201,8 +265,9 @@ class RequestHandler(BaseHTTPRequestHandler):
             """),
         )
         javascript = join(
-            *[Script({'src': v}) for v in libraries.values()
-              if v.endswith('.js')],
+            *[Script({'src': url})
+                for lib in self.libraries
+                for url in lib.js()],
             Script()(r"""
 function sendToServer() {
     var data = new FormData($("form")[0]);
@@ -270,26 +335,34 @@ function updateTryMe(force) {
     var the_doc = iframe_window.document;
     the_doc.open();
     the_doc.write("<html><head>")
-    $("input[name=libraries][value$=\".css\"]").each(function() {
-        var jqt = $(this);
-        if (jqt.prop("checked")) {
+    $("[data-template$=\".css\"]").each(function() {
+        var version = $(this).closest(".list-group-item").find("select").val();
+        var url = $(this).attr("data-template");
+        if (version) {
+            url = url.replace("{version}", version);
             the_doc.write("<link rel=\"stylesheet\" href=\"");
-            the_doc.write(jqt.val());
-            the_doc.write("\"><\/script>");
+            the_doc.write(
+                $(this).attr("data-template").replace('{version}', version));
+            the_doc.write("\">");
         }
+        $(this).text(url);
     })
     the_doc.write("<style>")
     the_doc.write(document.getElementById("css-input").value);
     the_doc.write("<\/style>")
     the_doc.write("</head><body>")
     the_doc.write(document.getElementById("html-input").value);
-    $("input[name=libraries][value$=\".js\"]").each(function() {
-        var jqt = $(this);
-        if (jqt.prop("checked")) {
+    $("[data-template$=\".js\"]").each(function() {
+        var version = $(this).closest(".list-group-item").find("select").val();
+        var url = $(this).attr("data-template");
+        if (version) {
+            url = url.replace("{version}", version);
             the_doc.write("<script src=\"");
-            the_doc.write(jqt.val());
+            the_doc.write(
+                $(this).attr("data-template").replace('{version}', version));
             the_doc.write("\"><\/script>");
         }
+        $(this).text(url);
     })
     the_doc.write("<script>")
     the_doc.write(document.getElementById("js-input").value);
@@ -386,18 +459,7 @@ $("textarea").keydown(function (event) {
                         ),
                         Div('form-group tab-pane fade',
                             id='libraries-wrapper',
-                            role='tabpanel')(*[
-                            Div('form-check')(
-                                Label({'class': 'form-check-label'})(
-                                    Input({
-                                        'class': 'form-check-input',
-                                        'type': 'checkbox',
-                                        'name': 'libraries',
-                                        'value': url,
-                                        'checked': True}),
-                                    name))
-                            for name, url in libraries.items()
-                        ]),
+                            role='tabpanel')(self.library_wrapper_contents()),
                     ),
                     Button({
                         'type': 'button',
@@ -418,6 +480,44 @@ $("textarea").keydown(function (event) {
         )
         return str(doc).encode(charset)
 
+    def library_wrapper_contents(self):
+        return Ul({'class': 'list-group'})(*[
+            Li({'class': 'list-group-item'})(
+                Div('d-flex w-100 justify-content-between')(
+                    Tag.new('h5')({'class': 'mb-1'})(lib.name),
+                    Span()(
+                        'Use Version: ',
+                        Select({
+                            'class': 'custom-select',
+                            'onchange': 'updateTryMe(true);',
+                        },
+                            options=[('', '-- Disabled --')] + [
+                                (version, version) for version in lib.versions],
+                            selected=lib.current_version,
+                    )),
+                ),
+                *[
+                    Div(None, {'data-template': template})(
+                        template.format(version=lib.current_version))
+                    for template in lib.templates()
+                ],
+            ) for lib in self.libraries
+        ])
+        return [
+            Div('form-check')(
+                Label({'class': 'form-check-label'})(
+                    Input({
+                        'class': 'form-check-input',
+                        'type': 'checkbox',
+                        'name': 'libraries',
+                        'value': lib.name,
+                        'checked': True}),
+                    lib.name,
+                )
+            )
+            for lib in self.libraries
+        ]
+
     def do_POST(self):
         data = FieldStorage(self.rfile, environ=dict(
             REQUEST_METHOD='post',
@@ -432,6 +532,8 @@ $("textarea").keydown(function (event) {
         if 'javascript' in data:
             with open(self.name + '.js', 'w') as f:
                 f.write(data['javascript'].value)
+        with open(self.name + '-libs.ini', 'w') as f:
+            self.config.write(f)
         the_data = json.dumps(dict(status='ok')).encode('utf-8')
         self.send_response(200)
         self.send_header("Content-Type", "text/json")
