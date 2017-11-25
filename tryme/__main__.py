@@ -9,10 +9,13 @@ import argparse
 
 parser = argparse.ArgumentParser()
 parser.add_argument('name')
-parser.add_argument('address', nargs='?', default='localhost')
+parser.add_argument('address', nargs='?', default='*')
 parser.add_argument('port', nargs='?', default=8001, type=int)
 
 args = parser.parse_args()
+
+if args.address == '*':
+    args.address = '0.0.0.0'
 
 RequestHandler.name = args.name
 
