@@ -165,24 +165,46 @@ class Library:
 class RequestHandler(BaseHTTPRequestHandler):
     default_html = "&lt;h1 class=\"text-success\"&gt;Success&lt;/h1&gt;"
     default_css = ".text-success {\n  color: green;\n}"
-    default_js = """$("h1").click(function () {
-  alert("Clicked the header");
-})"""
-    # libraries = {
-    #     'JQuery 3.2.1': "https://code.jquery.com/jquery-3.2.1.min.js",
-    #     'Popper.js 1.12.3': "https://cdnjs.cloudflare.com/ajax/libs/popper.js/"
-    #                         "1.12.3/umd/popper.min.js",
-    #     'Bootstrap.js 4.0.0-beta.2':
-    #         "https://maxcdn.bootstrapcdn.com/bootstrap/"
-    #         "4.0.0-beta.2/js/bootstrap.min.js",
-    #     'Bootstrap.css 4.0.0-beta.2':
-    #         "https://maxcdn.bootstrapcdn.com/bootstrap/"
-    #         "4.0.0-beta.2/css/bootstrap.min.css",
-    # }
+    default_js = "$('h1').click(function () {\n  alert('Clicked header');\n})"
+    default_libraries = [
+        dict(
+            name='Jquery',
+            js='https://code.jquery.com/jquery-{version}.min.js',
+            versions='3.2.1',
+        ),
+        dict(
+            name='Popper',
+            js='https://cdnjs.cloudflare.com/ajax/libs/popper.js/'
+               '{version}/umd/popper.min.js',
+            versions='1.12.3',
+        ),
+        dict(
+            name='Bootstrap',
+            css="https://maxcdn.bootstrapcdn.com/bootstrap/"
+                "{version}/css/bootstrap.min.css",
+            js="https://maxcdn.bootstrapcdn.com/bootstrap/"
+                "{version}/js/bootstrap.min.js",
+            versions="4.0.0-beta.2",
+        ),
+    ]
 
     def __init__(self, *args, **kwargs):
         self.config =  ConfigParser()
         self.config.read(self.name + '-libs.ini')
+        if not self.config.sections():
+            for lib in self.default_libraries:
+                self.config.add_section(lib['name'])
+                section = self.config[lib['name']]
+                if 'js' in lib:
+                    section['js'] = lib['js']
+                if 'css' in lib:
+                    section['css'] = lib['css']
+                if 'versions' in lib:
+                    section['versions'] = lib['versions']
+                else:
+                    section['versions'] = 'current'
+            with open(self.name + '-libs.ini', 'w') as f:
+                self.config.write(f)
         super().__init__(*args, **kwargs)
 
     @property
