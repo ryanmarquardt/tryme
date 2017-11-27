@@ -334,6 +334,8 @@ consoleOverride('error', jsConsoleAppend("js-console-error"));
 .code-input {
     font-family: SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono",
                  "Courier New",monospace;
+    font-size: 80%;
+    line-height: 1.25;
 }
 iframe {
     width: 100%;
@@ -396,7 +398,7 @@ function updateTryMe(force) {
         updateTimeoutId = 0;
     }
     if (!force) {
-        updateTimeoutId = setTimeout(updateTryMe, 500, true);
+        updateTimeoutId = setTimeout(updateTryMe, 1000, true);
         return;
     };
     var iframe = document.createElement("iframe");

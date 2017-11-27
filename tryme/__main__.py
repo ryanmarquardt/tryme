@@ -19,8 +19,6 @@ if args.address == '*':
 
 RequestHandler.name = args.name
 
-# RequestHandler.make_document(RequestHandler)
-
 httpd = HTTPServer((args.address, args.port), RequestHandler)
 try:
     httpd.serve_forever()
